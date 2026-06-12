@@ -6,35 +6,33 @@
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .success { background: #e6fffa; color: #2c7a7b; }
-        .pending { background: #fffaf0; color: #9c4221; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .btn { background: #4a5568; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: #eee; }
+        .success { background: #c6f6d5; color: #22543d; }
+        .pending { background: #feebc8; color: #744210; }
+        .error { color: red; font-weight: bold; }
+        .config { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚀 SkyPatch OTA Dashboard</h1>
-        <div>
-            <input type="password" id="adminKey" value="skypatch_admin_key_2024_secure" style="width: 250px;">
-            <button class="btn" onclick="loadData()">Yenile</button>
-        </div>
+    <h1>🚀 SkyPatch OTA Dashboard</h1>
+    
+    <div class="card config">
+        <label>Admin Key:</label>
+        <input type="password" id="adminKey" placeholder="Enter Admin Key">
+        <div id="statusMsg">Bağlanılıyor...</div>
     </div>
 
     <div class="card">
         <h3>📱 Kayıtlı Cihazlar</h3>
-        <table id="deviceTable">
+        <table>
             <thead>
                 <tr>
                     <th>Cihaz ID</th>
                     <th>İsim</th>
-                    <th>Mevcut Sürüm</th>
+                    <th>Sürüm</th>
                     <th>Durum</th>
                     <th>Son Görülme</th>
                 </tr>
@@ -44,16 +42,10 @@
     </div>
 
     <div class="card">
-        <h3>⬆️ Yeni Yazılım Yükle</h3>
-        <div class="form-group">
-            <label>Sürüm (Örn: 1.0.1)</label>
-            <input type="text" id="version">
-        </div>
-        <div class="form-group">
-            <label>Dosya (.bin)</label>
-            <input type="file" id="file" accept=".bin">
-        </div>
-        <button class="btn" onclick="upload()">Yükle</button>
+        <h3>⬆️ Upload Firmware</h3>
+        <input type="text" id="vInput" placeholder="Version (e.g. 1.0.1)" style="margin-bottom:10px; width:200px;"><br>
+        <input type="file" id="fInput" accept=".bin" style="margin-bottom:10px;"><br>
+        <button onclick="upload()" style="padding:10px 20px; cursor:pointer;">Upload</button>
     </div>
 
     <script>
@@ -61,28 +53,39 @@
 
         async function loadData() {
             const key = document.getElementById('adminKey').value;
+            if(!key) {
+                document.getElementById('statusMsg').innerHTML = "Lütfen Admin Key girin.";
+                return;
+            }
+
             try {
                 const res = await fetch(`${API}/api/devices?admin_key=${key}`);
-                if (!res.ok) throw new Error("Yetki hatası!");
+                if (!res.ok) throw new Error("Yetki hatası veya Sunucu kapalı");
+                
                 const data = await res.json();
+                document.getElementById('statusMsg').innerHTML = `<span style="color: green;">✓ Connected</span>`;
+                
                 const body = document.getElementById('deviceBody');
-                body.innerHTML = data.devices.map(d => `
-                    <tr>
-                        <td>${d.device_id}</td>
-                        <td>${d.name}</td>
-                        <td>v${d.current_version || '1.0.0'}</td>
-                        <td><span class="status ${d.update_status}">${d.update_status}</span></td>
-                        <td>${new Date(d.last_seen).toLocaleString()}</td>
-                    </tr>
-                `).join('');
-            } catch (e) { alert(e.message); }
+                body.innerHTML = data.devices.length === 0 ? "<tr><td colspan='5'>No devices found.</td></tr>" : 
+                    data.devices.map(d => `
+                        <tr>
+                            <td>${d.device_id}</td>
+                            <td>${d.name}</td>
+                            <td>v${d.current_version}</td>
+                            <td><span class="status ${d.update_status}">${d.update_status}</span></td>
+                            <td>${new Date(d.last_seen).toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+            } catch (e) {
+                document.getElementById('statusMsg').innerHTML = `<span class="error">✗ ${e.message}</span>`;
+            }
         }
 
         async function upload() {
             const key = document.getElementById('adminKey').value;
-            const version = document.getElementById('version').value;
-            const file = document.getElementById('file').files[0];
-            if(!version || !file) return alert("Eksik bilgi!");
+            const version = document.getElementById('vInput').value;
+            const file = document.getElementById('fInput').files[0];
+            if(!key || !version || !file) return alert("Eksik bilgi!");
 
             const formData = new FormData();
             formData.append("file", file);
@@ -92,13 +95,11 @@
                     method: "POST",
                     body: formData
                 });
-                if (res.ok) { alert("Başarıyla yüklendi!"); loadData(); }
-                else alert("Yükleme başarısız!");
+                if (res.ok) alert("Success!"); else alert("Failed!");
             } catch (e) { alert(e.message); }
         }
 
         setInterval(loadData, 5000);
-        loadData();
     </script>
 </body>
 </html>
