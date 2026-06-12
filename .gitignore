@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+env/
+
+# SkyPatch Specific
+skypatch_ota.db
+firmware/*.bin
+server.log
+
+# Arduino / ESP8266
+build/
+libraries/
+*.hex
+*.bin
+
+# OS
+.DS_Store
+Thumbs.db

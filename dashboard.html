@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>SkyPatch OTA - Dashboard</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .success { background: #e6fffa; color: #2c7a7b; }
+        .pending { background: #fffaf0; color: #9c4221; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .btn { background: #4a5568; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 SkyPatch OTA Dashboard</h1>
+        <div>
+            <input type="password" id="adminKey" value="skypatch_admin_key_2024_secure" style="width: 250px;">
+            <button class="btn" onclick="loadData()">Yenile</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>📱 Kayıtlı Cihazlar</h3>
+        <table id="deviceTable">
+            <thead>
+                <tr>
+                    <th>Cihaz ID</th>
+                    <th>İsim</th>
+                    <th>Mevcut Sürüm</th>
+                    <th>Durum</th>
+                    <th>Son Görülme</th>
+                </tr>
+            </thead>
+            <tbody id="deviceBody"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>⬆️ Yeni Yazılım Yükle</h3>
+        <div class="form-group">
+            <label>Sürüm (Örn: 1.0.1)</label>
+            <input type="text" id="version">
+        </div>
+        <div class="form-group">
+            <label>Dosya (.bin)</label>
+            <input type="file" id="file" accept=".bin">
+        </div>
+        <button class="btn" onclick="upload()">Yükle</button>
+    </div>
+
+    <script>
+        const API = "http://localhost:8000";
+
+        async function loadData() {
+            const key = document.getElementById('adminKey').value;
+            try {
+                const res = await fetch(`${API}/api/devices?admin_key=${key}`);
+                if (!res.ok) throw new Error("Yetki hatası!");
+                const data = await res.json();
+                const body = document.getElementById('deviceBody');
+                body.innerHTML = data.devices.map(d => `
+                    <tr>
+                        <td>${d.device_id}</td>
+                        <td>${d.name}</td>
+                        <td>v${d.current_version || '1.0.0'}</td>
+                        <td><span class="status ${d.update_status}">${d.update_status}</span></td>
+                        <td>${new Date(d.last_seen).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            } catch (e) { alert(e.message); }
+        }
+
+        async function upload() {
+            const key = document.getElementById('adminKey').value;
+            const version = document.getElementById('version').value;
+            const file = document.getElementById('file').files[0];
+            if(!version || !file) return alert("Eksik bilgi!");
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const res = await fetch(`${API}/api/upload-firmware?version=${version}&admin_key=${key}`, {
+                    method: "POST",
+                    body: formData
+                });
+                if (res.ok) { alert("Başarıyla yüklendi!"); loadData(); }
+                else alert("Yükleme başarısız!");
+            } catch (e) { alert(e.message); }
+        }
+
+        setInterval(loadData, 5000);
+        loadData();
+    </script>
+</body>
+</html>
